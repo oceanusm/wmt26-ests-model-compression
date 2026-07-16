@@ -1,0 +1,10 @@
+{
+  "submission_id": "ests-gptoss-arz-k26",
+  "model_repo": "oceanusm/ests-gptoss-arz-k26",
+  "lang_pair": "eng-ara_EG",
+  "internal_target_lang": "arz_Arab",
+  "target_display_name": "Arabic, Egyptian",
+  "expected_average_drop": 26,
+  "artifact_format": "mxfp4",
+  "artifact_size_gib": 5.15
+}

@@ -1,57 +1,75 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+"""Download and expose one submission model without copying its weights."""
+
+from __future__ import annotations
+
 import argparse
-import shutil
+import json
+import os
 from pathlib import Path
+import shutil
 
 
 def resolve_model_source(model_id: str, cache_dir: Path) -> Path:
-    explicit_path = Path(model_id).expanduser()
-    if explicit_path.exists():
-        return explicit_path
-    if explicit_path.is_absolute():
-        raise FileNotFoundError(f"Model path does not exist: {explicit_path}")
+    explicit = Path(model_id).expanduser()
+    if explicit.exists():
+        return explicit.resolve()
+    if explicit.is_absolute():
+        raise FileNotFoundError(f"Model path does not exist: {explicit}")
 
-    cached_model_dir = cache_dir.expanduser() / model_id
-    if (cached_model_dir / "config.json").exists():
-        return cached_model_dir
+    cached = cache_dir.expanduser() / model_id
+    if (cached / "config.json").is_file():
+        return cached.resolve()
 
-    cached_model_dir.parent.mkdir(parents=True, exist_ok=True)
+    cached.parent.mkdir(parents=True, exist_ok=True)
     from huggingface_hub import snapshot_download
 
-    snapshot_download(repo_id=model_id, local_dir=cached_model_dir)
-    (cached_model_dir / "._DOWNLOAD_OK").touch()
-    return cached_model_dir
+    snapshot_download(
+        repo_id=model_id,
+        local_dir=cached,
+        token=os.environ.get("HF_TOKEN") or None,
+    )
+    if not (cached / "config.json").is_file():
+        raise FileNotFoundError(f"Downloaded model is missing config.json: {cached}")
+    return cached.resolve()
 
 
-def link_model(source: Path, output_dir: Path, copy: bool = False):
-    output_dir = output_dir.expanduser()
-    if (output_dir / "config.json").exists():
-        print(f"Model already prepared at {output_dir}")
+def expose_model(source: Path, output: Path, *, copy: bool) -> None:
+    output = output.expanduser()
+    if output.exists() and output.resolve() == source.resolve():
+        print(f"Model is already available at {output}")
         return
-    if output_dir.exists() or output_dir.is_symlink():
-        raise FileExistsError(f"Refusing to overwrite incomplete model directory: {output_dir}")
-
-    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    if (output / "config.json").is_file():
+        print(f"Model is already prepared at {output}")
+        return
+    if output.exists() or output.is_symlink():
+        raise FileExistsError(
+            f"Refusing to overwrite incomplete model directory: {output}"
+        )
+    output.parent.mkdir(parents=True, exist_ok=True)
     if copy:
-        shutil.copytree(source, output_dir)
+        shutil.copytree(source, output)
     else:
-        try:
-            output_dir.symlink_to(source.resolve(), target_is_directory=True)
-        except OSError:
-            shutil.copytree(source, output_dir)
-    print(f"Prepared model at {output_dir} from {source}")
+        output.symlink_to(source, target_is_directory=True)
+    print(f"Prepared model at {output} from {source}")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Prepare the uncompressed Gemma baseline model")
-    parser.add_argument("--model-id", default="google/gemma-3-12b-it")
-    parser.add_argument("--cache-dir", type=Path, default="/mnt/tg/data/projects/wmt26/model-compression/models")
-    parser.add_argument("--output", type=Path, default="workdir/model")
-    parser.add_argument("--copy", action="store_true", help="Copy model files instead of symlinking")
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--submission-config", type=Path, required=True)
+    parser.add_argument("--cache-dir", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--copy", action="store_true")
     args = parser.parse_args()
 
-    source = resolve_model_source(args.model_id, args.cache_dir)
-    link_model(source, args.output, copy=args.copy)
+    output = args.output.expanduser()
+    if (output / "config.json").is_file():
+        print(f"Model is already prepared at {output}")
+        return
+
+    submission = json.loads(args.submission_config.read_text(encoding="utf-8"))
+    source = resolve_model_source(str(submission["model_repo"]), args.cache_dir)
+    expose_model(source, output, copy=args.copy)
 
 
 if __name__ == "__main__":

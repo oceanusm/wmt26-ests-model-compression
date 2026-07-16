@@ -85,6 +85,14 @@ class ESTSSubmissionTests(unittest.TestCase):
             self.assertEqual(value["average_keep"], 6)
             self.assertEqual(value["format"], "bf16")
 
+    def test_tokenizers_backend_compatibility_registration(self):
+        import transformers
+
+        backend = MODULE.patch_tokenizers_backend_for_vllm()
+        self.assertIs(transformers.TokenizersBackend, backend)
+        self.assertTrue(hasattr(backend, "from_pretrained"))
+        self.assertTrue(hasattr(backend, "all_special_tokens_extended"))
+
     def test_prepare_model_accepts_prepared_model_without_hub_lookup(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

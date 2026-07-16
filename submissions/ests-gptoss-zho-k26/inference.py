@@ -276,6 +276,51 @@ def validate_model_checkpoint(model_dir: Path, config: SubmissionConfig) -> dict
     }
 
 
+def patch_tokenizers_backend_for_vllm() -> type:
+    """Let Transformers 4.x load tokenizer configs written by Transformers 5.x."""
+    import transformers
+    from transformers import PreTrainedTokenizerBase, PreTrainedTokenizerFast
+
+    try:
+        from transformers.tokenization_utils_tokenizers import TokenizersBackend
+    except (ImportError, ModuleNotFoundError):
+        # Transformers 5 writes this class name into tokenizer_config.json, while
+        # vLLM 0.11.1 requires Transformers 4.x. Both classes load tokenizer.json.
+        TokenizersBackend = PreTrainedTokenizerFast
+
+    # AutoTokenizer's 4.x class-name lookup checks the top-level module last.
+    setattr(transformers, "TokenizersBackend", TokenizersBackend)
+
+    if not hasattr(PreTrainedTokenizerBase, "all_special_tokens_extended"):
+        def all_special_tokens_extended(self):
+            tokens = []
+            for attr in getattr(self, "SPECIAL_TOKENS_ATTRIBUTES", []):
+                value = getattr(self, attr, None)
+                if value is None:
+                    continue
+                if isinstance(value, (list, tuple)):
+                    tokens.extend(value)
+                else:
+                    tokens.append(value)
+
+            deduped = []
+            for token in tokens:
+                if token not in deduped:
+                    deduped.append(token)
+            return deduped
+
+        PreTrainedTokenizerBase.all_special_tokens_extended = property(
+            all_special_tokens_extended
+        )
+
+    if not hasattr(TokenizersBackend, "all_special_tokens_extended"):
+        TokenizersBackend.all_special_tokens_extended = property(
+            lambda self: self.all_special_tokens
+        )
+
+    return TokenizersBackend
+
+
 class GPTOSSGenerator:
     def __init__(
         self,
@@ -290,6 +335,9 @@ class GPTOSSGenerator:
 
         from transformers import AutoConfig
         from transformers.models.gpt_oss.configuration_gpt_oss import GptOssConfig
+
+        patch_tokenizers_backend_for_vllm()
+
         from vllm import LLM
         from vllm.model_executor.models import ModelRegistry
 

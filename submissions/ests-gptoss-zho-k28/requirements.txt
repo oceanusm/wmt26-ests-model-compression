@@ -1,0 +1,9 @@
+torch==2.11.0 # --index-url https://download.pytorch.org/whl/cu130
+
+transformers>=4.51.1,<5
+huggingface-hub>=0.34.0,<1.0
+tokenizers>=0.22.0,<=0.23.0
+Pillow>=10.0.1,<=15.0
+
+accelerate==1.6.0
+tqdm>=4.67.0

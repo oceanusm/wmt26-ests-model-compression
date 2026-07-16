@@ -16,18 +16,18 @@ USE_CHAT_TEMPLATE = True
 LOG.basicConfig(level=LOG.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-class BnbQ4LLM(Gemma3LLMBase):
+class BaselineLLM(Gemma3LLMBase):
     pass
 
 
 def main():
-    run_inference(parse_args(), BnbQ4LLM, use_chat_template=USE_CHAT_TEMPLATE)
+    run_inference(parse_args(), BaselineLLM, use_chat_template=USE_CHAT_TEMPLATE)
 
 
 def parse_args():
     return parse_inference_args(
         default_model=default_model_path(__file__),
-        description="Run translation using the BNB q4 Gemma baseline",
+        description="Run translation using the uncompressed Gemma baseline",
         default_prompt=TRANSLATE_PROMPT,
         default_max_new_tokens=DEF_MAX_NEW_TOKENS,
         default_max_new_tokens_over_input=DEF_MAX_NEW_TOKENS_OVER_INPUT,

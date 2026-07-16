@@ -7,7 +7,7 @@ modelzip_source="${MODELZIP_SOURCE:-$(cd "$root_dir/../.." && pwd)}"
 model_dir="${MODEL_DIR:-$root_dir/workdir/model}"
 model_cache="${MODEL_CACHE:-/mnt/tg/data/projects/wmt26/model-compression/models}"
 
-uv venv --python 3.12 "$venv_dir"
+uv venv --clear --python 3.12 "$venv_dir"
 source "$venv_dir/bin/activate"
 uv pip install -r "$root_dir/requirements.txt"
 uv pip install --no-deps -e "$modelzip_source"

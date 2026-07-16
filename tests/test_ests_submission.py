@@ -243,6 +243,39 @@ class ESTSSubmissionTests(unittest.TestCase):
         )
         self.assertEqual(diagnostics["final_json_leaf_success"], 1)
 
+    def test_raw_fallback_emits_raw_completion_not_parser_error(self):
+        record = MODULE.PreparedRecord(
+            index=0,
+            source_text="A source sentence.",
+            category="speech",
+            model_category="speech",
+            model_source_text="A source sentence.",
+            instruction="Translate:",
+            prompt="Translate:\n\nA source sentence.",
+        )
+        finals = {}
+        diagnostics = MODULE.Counter()
+        MODULE.apply_raw_fallbacks(
+            [record],
+            finals,
+            {
+                0: [
+                    {
+                        "seed": 0,
+                        "model_hyp_text": "ERROR: HIT MAX TOKENS",
+                        "raw_comp_text": "النص الخام الفعلي",
+                        "failure_reasons": ["hit_max_tokens"],
+                        "validation": {},
+                    }
+                ]
+            },
+            diagnostics,
+        )
+        self.assertEqual(
+            finals[0],
+            ("النص الخام الفعلي", "raw_completion_fallback"),
+        )
+
     def test_all_submission_metadata(self):
         expected = {
             "ests-gptoss-zho-k26": ("eng-zho_Hans", "zho_Hans", 26, 5.15),

@@ -1028,12 +1028,12 @@ def apply_raw_fallbacks(
         candidates = [
             attempt
             for attempt in attempts[record.index]
-            if str(attempt.get("model_hyp_text") or "").strip()
+            if str(attempt.get("raw_comp_text") or "").strip()
         ]
         if record.category != "json" and candidates:
             selected = max(candidates, key=raw_fallback_rank)
             finals[record.index] = (
-                str(selected["model_hyp_text"]).strip(),
+                str(selected["raw_comp_text"]).strip(),
                 "raw_completion_fallback",
             )
             diagnostics["raw_completion_fallback"] += 1

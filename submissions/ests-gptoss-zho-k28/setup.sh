@@ -7,6 +7,15 @@ modelzip_source="${MODELZIP_SOURCE:-$(cd "$root_dir/../.." && pwd)}"
 model_dir="${MODEL_DIR:-$root_dir/workdir/model}"
 model_cache="${MODEL_CACHE:-/mnt/tg/data/projects/wmt26/model-compression/models}"
 
+if ! command -v uv >/dev/null 2>&1; then
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "setup.sh requires either uv or curl to bootstrap uv." >&2
+    exit 1
+  fi
+  curl -LsSf https://astral.sh/uv/0.11.29/install.sh | sh
+  export PATH="$HOME/.local/bin:$PATH"
+fi
+
 uv venv --clear --python 3.12 "$venv_dir"
 source "$venv_dir/bin/activate"
 uv pip install -r "$root_dir/requirements.txt"

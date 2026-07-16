@@ -93,6 +93,36 @@ class ESTSSubmissionTests(unittest.TestCase):
         self.assertTrue(hasattr(backend, "from_pretrained"))
         self.assertTrue(hasattr(backend, "all_special_tokens_extended"))
 
+    def test_tokenizers_backend_metadata_is_sanitized_without_model_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory)
+            original = {
+                "tokenizer_class": "TokenizersBackend",
+                "model_max_length": 131072,
+            }
+            (model / "tokenizer_config.json").write_text(
+                json.dumps(original), encoding="utf-8"
+            )
+            (model / "tokenizer.json").write_text("{}", encoding="utf-8")
+
+            temporary, tokenizer_dir = MODULE.prepare_vllm_tokenizer(model)
+            self.assertIsNotNone(temporary)
+            try:
+                sanitized = json.loads(
+                    (tokenizer_dir / "tokenizer_config.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(
+                    sanitized["tokenizer_class"], "PreTrainedTokenizerFast"
+                )
+                self.assertEqual(
+                    json.loads(
+                        (model / "tokenizer_config.json").read_text(encoding="utf-8")
+                    ),
+                    original,
+                )
+            finally:
+                temporary.cleanup()
+
     def test_prepare_model_accepts_prepared_model_without_hub_lookup(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -11,7 +11,9 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import sys
+import tempfile
 from typing import Any, Iterable, Mapping
 
 from wmt26_json_adapter import (
@@ -321,6 +323,38 @@ def patch_tokenizers_backend_for_vllm() -> type:
     return TokenizersBackend
 
 
+def prepare_vllm_tokenizer(model_dir: Path) -> tuple[Any | None, Path]:
+    """Create Transformers-4-compatible tokenizer metadata without touching the model."""
+    tokenizer_config_path = model_dir / "tokenizer_config.json"
+    tokenizer_config = json.loads(tokenizer_config_path.read_text(encoding="utf-8"))
+    if tokenizer_config.get("tokenizer_class") != "TokenizersBackend":
+        return None, model_dir
+
+    temporary = tempfile.TemporaryDirectory(prefix="ests-tokenizer-")
+    output = Path(temporary.name)
+    tokenizer_files = (
+        "tokenizer.json",
+        "special_tokens_map.json",
+        "added_tokens.json",
+        "chat_template.jinja",
+    )
+    for filename in tokenizer_files:
+        source = model_dir / filename
+        if source.is_file():
+            shutil.copy2(source, output / filename)
+
+    if not (output / "tokenizer.json").is_file():
+        temporary.cleanup()
+        raise FileNotFoundError(f"Model tokenizer.json is missing from {model_dir}")
+
+    tokenizer_config["tokenizer_class"] = "PreTrainedTokenizerFast"
+    (output / "tokenizer_config.json").write_text(
+        json.dumps(tokenizer_config, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return temporary, output
+
+
 class GPTOSSGenerator:
     def __init__(
         self,
@@ -357,8 +391,10 @@ class GPTOSSGenerator:
         self.temperature = float(temperature)
         self.batch_size = int(batch_size)
         self._encoding = None
+        self._tokenizer_temporary, tokenizer_dir = prepare_vllm_tokenizer(model_dir)
         self.llm = LLM(
             model=str(model_dir),
+            tokenizer=str(tokenizer_dir),
             tensor_parallel_size=1,
             gpu_memory_utilization=float(
                 os.environ.get("VLLM_GPU_MEMORY_UTILIZATION", "0.90")
